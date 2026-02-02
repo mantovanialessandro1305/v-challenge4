@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>V-CHALLENGE ULTIMATE: 2026</title>
+    <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;500;700&display=swap" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <style>
+        :root { --matrix-green: #00ff41; --panel-bg: rgba(10, 10, 10, 0.95); }
+        * { box-sizing: border-box; outline: none; }
+        html, body { height: 100%; margin: 0; padding: 0; background: black; font-family: 'Lexend', sans-serif; overflow: hidden; }
+        #matrix-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+        body { display: flex; justify-content: center; align-items: center; padding: 15px; }
+        .container { position: relative; z-index: 10; background: var(--panel-bg); width: 100%; max-width: 420px; padding: 25px; border: 1px solid var(--matrix-green); border-radius: 12px; box-shadow: 0 0 30px rgba(0, 255, 65, 0.2); text-align: center; max-height: 95vh; overflow-y: auto; }
+        h1 { color: var(--matrix-green); font-size: 1.8rem; margin: 0 0 15px 0; letter-spacing: 3px; text-shadow: 0 0 10px var(--matrix-green); }
+        .panel { background: rgba(30, 30, 30, 0.5); border-radius: 8px; padding: 15px; margin: 10px 0; border-left: 3px solid var(--matrix-green); text-align: left; color: #ccc; }
+        input { width: 100%; padding: 14px; margin-bottom: 12px; background: #000; border: 1px solid #333; border-radius: 8px; color: var(--matrix-green); font-size: 1.1rem; text-align: center; font-family: 'Lexend', sans-serif; }
+        button { background: rgba(0, 255, 65, 0.1); color: var(--matrix-green); border: 1px solid var(--matrix-green); padding: 15px; border-radius: 8px; font-weight: 700; cursor: pointer; width: 100%; text-transform: uppercase; margin-bottom: 10px; transition: 0.2s; font-family: 'Lexend', sans-serif; }
+        button:hover { background: rgba(0, 255, 65, 0.2); }
+        .secondary-btn { border: none; color: #777; font-size: 0.9rem; text-decoration: underline; background: none; cursor: pointer; display: block; margin: 10px auto; }
+        #verb-display { font-size: 2.6rem; color: #fff; margin: 20px 0; font-weight: 700; text-transform: uppercase; }
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.98); display: none; justify-content: center; align-items: center; z-index: 100; padding: 20px; }
+        .show-flex { display: flex !important; }
+        .hidden { display: none !important; }
+        table { width: 100%; color: white; border-collapse: collapse; font-size: 0.8rem; margin-top: 15px; }
+        th, td { border: 1px solid #333; padding: 10px; text-align: center; }
+        th { color: var(--matrix-green); background: #111; }
+        #countdown-timer { font-size: 8rem; color: var(--matrix-green); font-weight: 700; text-shadow: 0 0 20px var(--matrix-green); }
+        .shake { animation: shake 0.4s; }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-10px); } 75% { transform: translateX(10px); } }
+        .del-btn { color: #ff4444; cursor: pointer; border: none; background: none; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <canvas id="matrix-canvas"></canvas>
+
+    <div class="container" id="main-menu">
+        <h1>V-CHALLENGE</h1>
+        <div id="auth-section">
+            <input type="text" id="log-user" placeholder="AGENT NAME">
+            <input type="password" id="log-pass" placeholder="PASSWORD">
+            <button onclick="login()">AUTHORIZE ACCESS</button>
+            <button class="secondary-btn" style="color:var(--matrix-green)" onclick="alert('MISSION OBJECTIVE:\nComplete 22 verbs in the shortest time possible.\n\nSCORING SYSTEM:\n- Finish within 2:30 min: 4 POINTS\n- Finish within 3:30 min: 3 POINTS\n- Finish within 4:00 min: 2 POINTS\n\nWARNING: Any error will reset your current round score to 0!')">SYSTEM PROTOCOLS</button>
+            <button class="secondary-btn" onclick="promptAdmin()" style="opacity:0.3; font-size:0.7rem;">ADMIN PANEL</button>
+        </div>
+        <div id="user-dash" class="hidden">
+            <h2 id="welcome-msg" style="color:var(--matrix-green)"></h2>
+            <div class="panel">
+                <p>Global Rank: <b id="rank-pos" style="color:white">#?</b></p>
+                <p>Total Points: <b id="total-pts-dash" style="color:white">0</b></p>
+                <p>Best Single Score: <b id="best-pts" style="color:white">0</b></p>
+            </div>
+            <button onclick="startCountdown()">START CHALLENGE</button>
+            <button onclick="showGlobalRanking()">GLOBAL RANKING</button>
+            <button class="secondary-btn" onclick="logout()">LOGOUT</button>
+        </div>
+    </div>
+
+    <div id="countdown-screen" class="overlay">
+        <div id="countdown-timer">3</div>
+    </div>
+
+    <div id="game-screen" class="overlay">
+        <div class="container" id="game-box">
+            <div style="display:flex; justify-content:space-between; color:var(--matrix-green); font-weight:bold;">
+                <span id="timer">4:00</span>
+                <span id="score">0/22</span>
+            </div>
+            <div id="verb-display">...</div>
+            <input type="text" id="simple" placeholder="Past Simple" autocomplete="off" spellcheck="false">
+            <input type="text" id="participle" placeholder="Past Participle" autocomplete="off" spellcheck="false">
+            <button onclick="checkAnswer()">VERIFY DATA</button>
+        </div>
+    </div>
+
+    <div id="admin-screen" class="overlay">
+        <div class="container" style="max-width:95%;">
+            <h1 id="ranking-title">CLASS DATABASE</h1>
+            <div style="max-height: 60vh; overflow-y: auto;">
+                <table id="admin-table">
+                    <thead><tr><th>Agent</th><th>Total Pts</th><th>Best</th><th>Match</th><th class="admin-only hidden">Action</th></tr></thead>
+                    <tbody id="admin-body"></tbody>
+                </table>
+            </div>
+            <button class="secondary-btn" onclick="showScreen('main-menu')" style="color:white; margin-top:15px;">CLOSE</button>
+        </div>
+    </div>
+
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyDiYwRotEyd1RSK29X4ozc_oig0DKt5epE",
+        authDomain: "irregular-verbs-4ecaa.firebaseapp.com",
+        databaseURL: "https://irregular-verbs-4ecaa-default-rtdb.firebaseio.com",
+        projectId: "irregular-verbs-4ecaa",
+        storageBucket: "irregular-verbs-4ecaa.firebasestorage.app",
+        messagingSenderId: "769958977339",
+        appId: "1:769958977339:web:ef45edc9d061f79d42a11e"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+    const DB_PATH = 'v_challenge_final_v5/'; 
+
+    const allVerbs = [{b:"arise",s:"arose",p:"arisen"},{b:"awake",s:"awoke",p:"awoken"},{b:"be",s:"was/were",p:"been"},{b:"bear",s:"bore",p:"borne"},{b:"beat",s:"beat",p:"beaten"},{b:"become",s:"became",p:"become"},{b:"begin",s:"began",p:"begun"},{b:"bend",s:"bent",p:"bent"},{b:"bet",s:"bet",p:"bet"},{b:"bind",s:"bound",p:"bound"},{b:"bite",s:"bit",p:"bitten"},{b:"bleed",s:"bled",p:"bled"},{b:"blow",s:"blew",p:"blown"},{b:"break",s:"broke",p:"broken"},{b:"breed",s:"bred",p:"bred"},{b:"bring",s:"brought",p:"brought"},{b:"broadcast",s:"broadcast",p:"broadcast"},{b:"build",s:"built",p:"built"},{b:"burn",s:"burnt",p:"burnt"},{b:"burst",s:"burst",p:"burst"},{b:"buy",s:"bought",p:"bought"},{b:"cast",s:"cast",p:"cast"},{b:"catch",s:"caught",p:"caught"},{b:"choose",s:"chose",p:"chosen"},{b:"come",s:"came",p:"come"},{b:"cost",s:"cost",p:"cost"},{b:"creep",s:"crept",p:"crept"},{b:"cut",s:"cut",p:"cut"},{b:"deal",s:"dealt",p:"dealt"},{b:"dig",s:"dug",p:"dug"},{b:"do",s:"did",p:"done"},{b:"draw",s:"drew",p:"drawn"},{b:"dream",s:"dreamt",p:"dreamt"},{b:"drink",s:"drank",p:"drunk"},{b:"drive",s:"drove",p:"driven"},{b:"eat",s:"ate",p:"eaten"},{b:"fall",s:"fell",p:"fallen"},{b:"feed",s:"fed",p:"fed"},{b:"feel",s:"felt",p:"felt"},{b:"fight",s:"fought",p:"fought"},{b:"find",s:"found",p:"found"},{b:"flee",s:"fled",p:"fled"},{b:"fling",s:"flung",p:"flung"},{b:"fly",s:"flew",p:"flown"},{b:"forbid",s:"forbade",p:"forbidden"},{b:"forecast",s:"forecast",p:"forecast"},{b:"forget",s:"forgot",p:"forgotten"},{b:"forgive",s:"forgave",p:"forgiven"},{b:"forsake",s:"forsook",p:"forsaken"},{b:"freeze",s:"froze",p:"frozen"},{b:"get",s:"got",p:"got"},{b:"give",s:"gave",p:"given"},{b:"go",s:"went",p:"gone"},{b:"grind",s:"ground",p:"ground"},{b:"grow",s:"grew",p:"grown"},{b:"hang",s:"hung",p:"hung"},{b:"have",s:"had",p:"had"},{b:"hear",s:"heard",p:"heard"},{b:"hide",s:"hid",p:"hidden"},{b:"hit",s:"hit",p:"hit"},{b:"hold",s:"held",p:"held"},{b:"hurt",s:"hurt",p:"hurt"},{b:"keep",s:"kept",p:"kept"},{b:"kneel",s:"knelt",p:"knelt"},{b:"knit",s:"knit",p:"knit"},{b:"know",s:"knew",p:"known"},{b:"lay",s:"laid",p:"laid"},{b:"lead",s:"led",p:"led"},{b:"lean",s:"leant",p:"leant"},{b:"leap",s:"leapt",p:"leapt"},{b:"learn",s:"learnt",p:"learnt"},{b:"leave",s:"left",p:"left"},{b:"lend",s:"lent",p:"lent"},{b:"let",s:"let",p:"let"},{b:"lie",s:"lay",p:"lain"},{b:"light",s:"lit",p:"lit"},{b:"lose",s:"lost",p:"lost"},{b:"make",s:"made",p:"made"},{b:"mean",s:"meant",p:"meant"},{b:"meet",s:"met",p:"met"},{b:"mistake",s:"mistook",p:"mistaken"},{b:"mow",s:"mowed",p:"mown"},{b:"overcome",s:"overcame",p:"overcome"},{b:"pay",s:"paid",p:"paid"},{b:"put",s:"put",p:"put"},{b:"quit",s:"quit",p:"quit"},{b:"read",s:"read",p:"read"},{b:"rid",s:"rid",p:"rid"},{b:"ride",s:"rode",p:"ridden"},{b:"ring",s:"rang",p:"rung"},{b:"rise",s:"rose",p:"risen"},{b:"run",s:"ran",p:"run"},{b:"saw",s:"sawed",p:"sawn"},{b:"say",s:"said",p:"said"},{b:"see",s:"saw",p:"seen"},{b:"seek",s:"sought",p:"sought"},{b:"sell",s:"sold",p:"sold"},{b:"send",s:"sent",p:"sent"},{b:"set",s:"set",p:"set"},{b:"sew",s:"sewed",p:"sewn"},{b:"shake",s:"shook",p:"shaken"},{b:"shed",s:"shed",p:"shed"},{b:"shine",s:"shone",p:"shone"},{b:"shoot",s:"shot",p:"shot"},{b:"show",s:"showed",p:"shown"},{b:"shrink",s:"shrank",p:"shrunk"},{b:"shut",s:"shut",p:"shut"},{b:"sing",s:"sang",p:"sung"},{b:"sink",s:"sank",p:"sunk"},{b:"sit",s:"sat",p:"sat"},{b:"slay",s:"slew",p:"slain"},{b:"sleep",s:"slept",p:"slept"},{b:"slide",s:"slid",p:"slid"},{b:"sling",s:"slung",p:"slung"},{b:"smell",s:"smelt",p:"smelt"},{b:"sow",s:"sowed",p:"sown"},{b:"speak",s:"spoke",p:"spoken"},{b:"speed",s:"sped",p:"sped"},{b:"spell",s:"spelt",p:"spelt"},{b:"spend",s:"spent",p:"spent"},{b:"spill",s:"spilt",p:"spilt"},{b:"spit",s:"spat",p:"spat"},{b:"split",s:"split",p:"split"},{b:"spoil",s:"spoilt",p:"spoilt"},{b:"spread",s:"spread",p:"spread"},{b:"stand",s:"stood",p:"stood"},{b:"steal",s:"stole",p:"stolen"},{b:"stick",s:"stuck",p:"stuck"},{b:"sting",s:"stung",p:"stung"},{b:"stink",s:"stank",p:"stunk"},{b:"strike",s:"struck",p:"struck"},{b:"string",s:"strung",p:"strung"},{b:"strive",s:"strove",p:"striven"},{b:"swear",s:"swore",p:"sworn"},{b:"sweep",s:"swept",p:"swept"},{b:"swell",s:"swelled",p:"swollen"},{b:"swim",s:"swam",p:"swum"},{b:"swing",s:"swung",p:"swung"},{b:"take",s:"took",p:"taken"},{b:"teach",s:"taught",p:"taught"},{b:"tear",s:"tore",p:"torn"},{b:"tell",s:"told",p:"told"},{b:"think",s:"thought",p:"thought"},{b:"throw",s:"threw",p:"thrown"},{b:"thrust",s:"thrust",p:"thrust"},{b:"tread",s:"trod",p:"trodden"},{b:"understand",s:"understood",p:"understood"},{b:"undertake",s:"undertook",p:"undertaken"},{b:"wake",s:"woke",p:"woken"},{b:"wear",s:"wore",p:"worn"},{b:"weave",s:"wove",p:"woven"},{b:"weep",s:"wept",p:"wept"},{b:"win",s:"won",p:"won"},{b:"wind",s:"wound",p:"wound"},{b:"wring",s:"wrung",p:"wrung"},{b:"write",s:"wrote",p:"written"}];
+
+    let currentUser = null, gameVerbs = [], currentIndex = 0, score = 0, timeLeft = 240, timer, isAdminMode = false;
+
+    function showScreen(id) { 
+        document.querySelectorAll('.overlay').forEach(s => s.classList.remove('show-flex')); 
+        if(id !== 'main-menu') document.getElementById(id).classList.add('show-flex'); 
+    }
+
+    function login() {
+        const u = document.getElementById('log-user').value.trim();
+        const p = document.getElementById('log-pass').value.trim();
+        if(!u || !p) return alert("Agent Name e Password richiesti!");
+        const userKey = u.toLowerCase().replace(/[^a-z0-9]/g, '_');
+        database.ref(DB_PATH + userKey).once('value', (snap) => {
+            const data = snap.val();
+            if(data) {
+                if(data.pass === p) { currentUser = data; loadDashboard(); }
+                else alert("Access Denied: Wrong Password");
+            } else {
+                const newUser = { name: u, userKey: userKey, pass: p, bestScore: 0, totalScore: 0, gamesPlayed: 0 };
+                database.ref(DB_PATH + userKey).set(newUser).then(() => { currentUser = newUser; loadDashboard(); });
+            }
+        });
+    }
+
+    function loadDashboard() {
+        document.getElementById('welcome-msg').innerText = "AGENT: " + currentUser.name;
+        document.getElementById('best-pts').innerText = currentUser.bestScore || 0;
+        document.getElementById('total-pts-dash').innerText = currentUser.totalScore || 0;
+        database.ref(DB_PATH).once('value', (snap) => {
+            let list = []; snap.forEach(s => { if(s.val().name) list.push(s.val()); });
+            list.sort((a,b) => (b.totalScore || 0) - (a.totalScore || 0));
+            let rank = list.findIndex(x => x.userKey === currentUser.userKey) + 1;
+            document.getElementById('rank-pos').innerText = "#" + rank;
+        });
+        document.getElementById('auth-section').classList.add('hidden');
+        document.getElementById('user-dash').classList.remove('hidden');
+    }
+
+    function startCountdown() {
+        showScreen('countdown-screen');
+        let count = 3;
+        const cdDiv = document.getElementById('countdown-timer');
+        cdDiv.innerText = count;
+        const cdInterval = setInterval(() => {
+            count--;
+            if(count > 0) cdDiv.innerText = count;
+            else if(count === 0) cdDiv.innerText = "GO!";
+            else { clearInterval(cdInterval); showScreen('game-screen'); initGame(); }
+        }, 1000);
+    }
+
+    function initGame() {
+        gameVerbs = [...allVerbs].sort(() => 0.5 - Math.random()).slice(0, 22);
+        currentIndex = 0; score = 0; timeLeft = 240; updateUI();
+        timer = setInterval(() => {
+            timeLeft--;
+            document.getElementById('timer').innerText = Math.floor(timeLeft/60) + ":" + (timeLeft%60).toString().padStart(2,'0');
+            if(timeLeft <= 0) endGame(false);
+        }, 1000);
+    }
+
+    function updateUI() {
+        document.getElementById('score').innerText = score + "/22";
+        document.getElementById('verb-display').innerText = gameVerbs[currentIndex].b;
+        document.getElementById('simple').value = ""; document.getElementById('participle').value = "";
+        document.getElementById('simple').focus();
+    }
+
+    function checkAnswer() {
+        const s = document.getElementById('simple').value.toLowerCase().trim();
+        const p = document.getElementById('participle').value.toLowerCase().trim();
+        const v = gameVerbs[currentIndex];
+        let sOk = (v.b === "be") ? (s === "was" || s === "were" || s === "was/were" || s === "was were") : (s === v.s);
+        if(sOk && p === v.p) {
+            score++; currentIndex++;
+            if(score === 22) endGame(true); else updateUI();
+        } else {
+            document.getElementById('game-box').classList.add('shake');
+            setTimeout(() => document.getElementById('game-box').classList.remove('shake'), 400);
+            score = 0; currentIndex = 0; updateUI();
+        }
+    }
+
+    function endGame(win) {
+        clearInterval(timer);
+        let pts = 0;
+        
+        if (win) {
+            let timeUsed = 240 - timeLeft; // Tempo totale trascorso in secondi
+            
+            if (timeUsed <= 150) { // Entro 2 minuti e 30 secondi (150s)
+                pts = 4;
+            } else if (timeUsed <= 210) { // Entro 3 minuti e 30 secondi (210s)
+                pts = 3;
+            } else { // Entro i 4 minuti (240s)
+                pts = 2;
+            }
+        }
+
+        const userRef = database.ref(DB_PATH + currentUser.userKey);
+        userRef.once('value', (snap) => {
+            let data = snap.val();
+            data.totalScore = (data.totalScore || 0) + pts;
+            data.gamesPlayed = (data.gamesPlayed || 0) + 1;
+            if(pts > (data.bestScore || 0)) data.bestScore = pts;
+            userRef.set(data).then(() => { 
+                currentUser = data; 
+                alert(win ? "MISSION SUCCESS! Points earned: " + pts : "TIME EXPIRED! 0 points."); 
+                showScreen('main-menu'); loadDashboard(); 
+            });
+        });
+    }
+
+    function showGlobalRanking() {
+        const body = document.getElementById('admin-body');
+        const headerAction = document.querySelector('.admin-only');
+        body.innerHTML = "<tr><td colspan='5'>Syncing...</td></tr>";
+        if(isAdminMode) headerAction.classList.remove('hidden');
+        else headerAction.classList.add('hidden');
+
+        database.ref(DB_PATH).once('value', (snap) => {
+            body.innerHTML = "";
+            let list = [];
+            snap.forEach(s => { if(s.val().name) list.push(s.val()); });
+            list.sort((a,b) => (b.totalScore || 0) - (a.totalScore || 0));
+            list.forEach(u => {
+                let row = `<tr>
+                    <td>${u.name}</td>
+                    <td>${u.totalScore || 0}</td>
+                    <td>${u.bestScore || 0}</td>
+                    <td>${u.gamesPlayed || 0}</td>
+                    ${isAdminMode ? `<td><button class="del-btn" onclick="deleteUser('${u.userKey}')">DEL</button></td>` : ''}
+                </tr>`;
+                body.innerHTML += row;
+            });
+        });
+        showScreen('admin-screen');
+    }
+
+    function deleteUser(key) {
+        if(confirm("Eliminare definitivamente questo agente?")) {
+            database.ref(DB_PATH + key).remove().then(() => showGlobalRanking());
+        }
+    }
+
+    function promptAdmin() {
+        if(prompt("Admin Key:") === "STUART2026") {
+            isAdminMode = true;
+            document.getElementById('ranking-title').innerText = "ADMIN DATABASE";
+            showGlobalRanking();
+        }
+    }
+
+    function logout() { location.reload(); }
+
+    // Matrix Canvas
+    const canvas = document.getElementById('matrix-canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+    const drops = Array(Math.floor(canvas.width / 16)).fill(1);
+    function draw() {
+        ctx.fillStyle = "rgba(0, 0, 0, 0.08)"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#0F0"; ctx.font = "16px monospace";
+        drops.forEach((y, i) => {
+            ctx.fillText(Math.floor(Math.random()*2), i * 16, y * 16);
+            if (y * 16 > canvas.height && Math.random() > 0.975) drops[i] = 0;
+            drops[i]++;
+        });
+    }
+    setInterval(draw, 50);
+    window.addEventListener('keydown', (e) => { if(e.key === 'Enter') checkAnswer(); });
+</script>
+</body>
+</html>
